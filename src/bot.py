@@ -7,7 +7,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart, Command
-from aiogram.types import Message, BotCommand, BotCommandScopeDefault
+from aiogram.types import Message
 from src.config import settings
 from src.parse import get_data_about_product, get_spuid
 from src.utils import check_is_admin
@@ -24,8 +24,16 @@ async def command_start_handler(message: Message):
         await message.answer(f"You can't use this bot.")
 
 
-@dp.message(Command(commands="add_product"))
-async def message_about_link(message: Message):
+@dp.message(Command(commands="add_poizon_product"))
+async def message_about_poizon_link(message: Message):
+    if check_is_admin(message.chat.id):
+        await message.answer("Пришлите ссылку на товар.")
+    else:
+        await message.answer(f"You can't use this bot.")
+
+
+@dp.message(Command(commands="add_taobao_product"))
+async def message_about_taobao_link(message: Message):
     if check_is_admin(message.chat.id):
         await message.answer("Пришлите ссылку на товар.")
     else:
@@ -38,6 +46,7 @@ async def add_product(message: Message):
         try:
             spuid = get_spuid(message.text)
             data = get_data_about_product(spuid)
+            print(data)
             await message.answer("ye")
         except KeyError:
             await message.answer("Некорректная ссылка. Не удалось получить SpuId товара.")
