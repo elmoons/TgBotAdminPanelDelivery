@@ -14,6 +14,7 @@ from aiogram.fsm.state import State, StatesGroup
 
 from src.config import settings
 from src.parse import get_data_about_product, get_spuid
+from src.sheets import add_data_to_sheet
 from src.utils import check_is_admin
 
 dp = Dispatcher(storage=MemoryStorage())
