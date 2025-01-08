@@ -6,25 +6,21 @@ from src.config import settings
 
 def get_spuid(product_link: str):
     query = parse.urlparse(product_link).query
-    spuid = parse.parse_qs(query)['spuId'][0]
+    spuid = parse.parse_qs(query)["spuId"][0]
     if spuid is None:
         raise ValueError("SpuId is None")
     return spuid
 
 
 def get_data_about_product(spuId: int):
-    headers = {
-        "apiKey": settings.POIZON_API_KEY
-    }
+    headers = {"apiKey": settings.POIZON_API_KEY}
 
-    params = {
-        "spuId": spuId
-    }
+    params = {"spuId": spuId}
 
     response = requests.get(
         url="https://poizon-api.com/api/dewu/productDetailWithPrice",
         params=params,
-        headers=headers
+        headers=headers,
     )
 
     if response.status_code == 200:
@@ -51,11 +47,13 @@ def get_data_about_product(spuId: int):
                     "name": None,
                     "value": None,
                 },
-                "prices": []  # Список цен и сроков доставки
+                "prices": [],  # Список цен и сроков доставки
             }
 
             # Обрабатываем свойства
-            for prop in sku.get("properties", []):  # Защита от отсутствия ключа "properties"
+            for prop in sku.get(
+                "properties", []
+            ):  # Защита от отсутствия ключа "properties"
                 if prop["level"] == 1:
                     extracted_data["level_1"]["name"] = prop["saleProperty"]["name"]
                     extracted_data["level_1"]["value"] = prop["saleProperty"]["value"]
@@ -70,7 +68,7 @@ def get_data_about_product(spuId: int):
                         "tradeType": price_entry.get("tradeType"),
                         "tradeDesc": price_entry.get("tradeDesc"),
                         "price": price_entry.get("price"),
-                        "timeDelivery": price_entry.get("timeDelivery")
+                        "timeDelivery": price_entry.get("timeDelivery"),
                     }
                     extracted_data["prices"].append(price_data)
 

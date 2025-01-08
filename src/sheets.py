@@ -10,8 +10,7 @@ def initial():
     return sh
 
 
-def add_data_to_sheet(sh: Spreadsheet):
-    ...
+def add_data_to_sheet(sh: Spreadsheet): ...
 
 
 add_data_to_sheet(initial())
