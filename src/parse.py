@@ -77,4 +77,4 @@ def get_data_about_product(spuId: int):
         # Вывод всех конфигураций
         return json.dumps(result, indent=4, ensure_ascii=False)
     else:
-        return "Не удалось получить данные от API."
+        raise KeyError
