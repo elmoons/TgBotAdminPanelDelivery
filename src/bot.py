@@ -58,7 +58,7 @@ async def handle_poizon_link(message: Message, state: FSMContext):
             stmt_product_add = insert(ProductsPoizonLinksOrm).values(title=data[0]["title"], link=message.text)
             await session.execute(stmt_product_add)
             await session.commit()
-            await message.answer(f"Данные товара с Poizon получены.")
+            await message.answer(f"Данные товара с Poizon успешно получены.")
     finally:
         await state.clear()
 

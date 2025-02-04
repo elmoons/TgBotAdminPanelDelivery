@@ -73,8 +73,6 @@ def get_data_about_product(spuId: int):
                     extracted_data["prices"].append(price_data)
 
             result.append(extracted_data)
-
-        # Вывод всех конфигураций
-        return json.dumps(result, indent=4, ensure_ascii=False)
+        return result
     else:
         raise KeyError
