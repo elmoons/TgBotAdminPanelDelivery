@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import sys
 
@@ -22,6 +23,11 @@ from src.utils import check_is_admin, admin_required
 
 dp = Dispatcher(storage=MemoryStorage())
 
+import gspread
+from gspread import Client, Spreadsheet, Worksheet
+
+from src.config import settings
+
 
 class AddProductStates(StatesGroup):
     link_poizon_product = State()
@@ -44,13 +50,20 @@ async def message_about_poizon_link(message: Message, state: FSMContext):
     await message.answer("Пришлите ссылку на товар.")
 
 
+def initial():
+    gc: Client = gspread.service_account(".././credentials.json")
+    sh: Spreadsheet = gc.open_by_url(settings.SPREADSHEET_URL)
+    return sh
+
+
 @dp.message(AddProductStates.link_poizon_product)
 @admin_required
 async def handle_poizon_link(message: Message, state: FSMContext):
     try:
         spuid = get_spuid(message.text)
         data = get_data_about_product(spuid)
-        print(data)
+        json_data = json.dumps(data, ensure_ascii=False, indent=4)  # ensure_ascii=False для корректного отображения Unicode
+        print(json_data)
     except KeyError:
         await message.answer("Некорректная ссылка. Не удалось получить SpuId товара.")
     else:
@@ -58,6 +71,7 @@ async def handle_poizon_link(message: Message, state: FSMContext):
             stmt_product_add = insert(ProductsPoizonLinksOrm).values(title=data[0]["title"], link=message.text)
             await session.execute(stmt_product_add)
             await session.commit()
+            add_data_to_sheet(initial(), data)
             await message.answer(f"Данные товара с Poizon успешно получены.")
     finally:
         await state.clear()

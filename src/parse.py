@@ -1,4 +1,3 @@
-import json
 import requests
 from urllib import parse
 from src.config import settings
