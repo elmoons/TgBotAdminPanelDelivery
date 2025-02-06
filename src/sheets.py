@@ -13,7 +13,7 @@ def initial():
 
 
 def add_data_to_sheet(sh, data):
-    worksheet = sh.sheet1  # Используем первый лист
+    worksheet = sh.sheet1
 
     rows = []
 
@@ -24,8 +24,8 @@ def add_data_to_sheet(sh, data):
         config = product["level_2"]["value"]
 
         for price_entry in product["prices"]:
-            price = price_entry["price"] / 100  # Переводим цену в валюту (если в центах/копейках)
-            trade_desc = price_entry["tradeDesc"] or "Обычная доставка"  # Название типа доставки
+            price = price_entry["price"] / 100
+            trade_desc = price_entry["tradeDesc"] or "Обычная доставка"
             min_delivery = price_entry["timeDelivery"]["min"]
             max_delivery = price_entry["timeDelivery"]["max"]
 
