@@ -4,6 +4,7 @@ import gspread
 from gspread import Client, Spreadsheet, Worksheet
 
 from src.config import settings
+from src.utils import final_cost_formula
 
 
 def initial():
@@ -12,7 +13,7 @@ def initial():
     return sh
 
 
-def add_data_to_sheet(sh, data):
+async def add_data_to_sheet(sh, data, data_about_prices):
     worksheet = sh.sheet1
 
     rows = []
@@ -29,17 +30,27 @@ def add_data_to_sheet(sh, data):
             min_delivery = price_entry["timeDelivery"]["min"]
             max_delivery = price_entry["timeDelivery"]["max"]
 
-            result_price = 5
+            result_price = final_cost_formula(
+                a=price,
+                b=data_about_prices["redemption_price_in_yuan"],
+                c=data_about_prices["yuan_to_ruble_exchange_rate"],
+                d=data_about_prices["delivery_price"],
+                e=data_about_prices["markup_coefficient"],
+                f=data_about_prices["additional_services_price"],
+            )
 
-            rows.append([image_formula, title, f"Цвет: {color}", f"Конфиг: {config}", f"{price} ¥", trade_desc, f"От {min_delivery} дней", f"До {max_delivery} дней", f"Итог: {result_price} ₽"])
+            rows.append(
+                [
+                    image_formula,
+                    title,
+                    f"Цвет: {color}",
+                    f"Конфиг: {config}",
+                    f"{price} ¥",
+                    trade_desc,
+                    f"От {min_delivery} дней",
+                    f"До {max_delivery} дней",
+                    f"Итог: {result_price} ₽",
+                ]
+            )
 
     worksheet.append_rows(rows, value_input_option="USER_ENTERED")
-
-
-with open("test.json", "r", encoding="utf-8") as file:
-    data = json.load(file)
-
-
-add_data_to_sheet(initial(), data)
-
-
