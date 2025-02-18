@@ -49,7 +49,7 @@ async def add_data_to_sheet(sh, data, data_about_prices):
                     trade_desc,
                     f"От {min_delivery} дней",
                     f"До {max_delivery} дней",
-                    f"Итог: {result_price} ₽",
+                    f"Итог: {round(result_price, 2)} ₽",
                 ]
             )
 

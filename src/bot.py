@@ -19,7 +19,7 @@ from src.database import async_session_maker
 from src.models import ProductsPoizonLinksOrm, DataForFinalPrice
 from src.parse import get_data_about_product, get_spuid
 from src.sheets import add_data_to_sheet
-from src.utils import check_is_admin, admin_required
+from src.utils import check_is_admin, admin_required, get_data_about_price_from_db
 
 dp = Dispatcher(storage=MemoryStorage())
 
@@ -70,23 +70,28 @@ async def handle_poizon_link(message: Message, state: FSMContext):
             stmt_product_add = insert(ProductsPoizonLinksOrm).values(
                 title=data[0]["title"], link=message.text
             )
-            query = select(DataForFinalPrice)
             await session.execute(stmt_product_add)
-            data_price = await session.execute(query)
+            data_about_prices = await get_data_about_price_from_db()
 
-            for price in data_price.scalars().first():
-                data_about_prices = {
-                    "redemption_price_in_yuan": price.redemption_price_in_yuan,
-                    "yuan_to_ruble_exchange_rate": price.yuan_to_ruble_exchange_rate,
-                    "delivery_price": price.delivery_price,
-                    "markup_coefficient": price.markup_coefficient,
-                    "additional_services_price": price.additional_services_price,
-                }
             await session.commit()
             await add_data_to_sheet(initial(), data, data_about_prices)
             await message.answer(f"Данные товара с Poizon успешно получены.")
     finally:
         await state.clear()
+
+
+@dp.message(Command(commands="get_data_about_price"))
+@admin_required
+async def handle_get_data_about_price(message: Message):
+    data_about_prices = await get_data_about_price_from_db()
+    await message.answer(
+        f"Актуальные данные ценообразования\n"
+        f"Цена выкупа: {data_about_prices["redemption_price_in_yuan"]} ¥\n"
+        f"Курс ¥ к ₽: {data_about_prices["yuan_to_ruble_exchange_rate"]}\n"
+        f"Стоимость доставки: {data_about_prices["delivery_price"]} ¥\n"
+        f"Коэф. наценки: {data_about_prices["markup_coefficient"]}\n"
+        f"Стоимость доп. услуг: {data_about_prices["additional_services_price"]}\n"
+    )
 
 
 @dp.message()
