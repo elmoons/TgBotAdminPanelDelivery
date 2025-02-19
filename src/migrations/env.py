@@ -6,8 +6,7 @@ from sqlalchemy import pool
 from alembic import context
 
 from src.config import settings
-from src.database import BaseOrm
-from src.models import ProductsPoizonLinksOrm
+from src.database.database import BaseOrm
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

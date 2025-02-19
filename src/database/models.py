@@ -1,7 +1,6 @@
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy import String
 
-from src.database import BaseOrm
+from src.database.database import BaseOrm
 
 
 class ProductsPoizonLinksOrm(BaseOrm):

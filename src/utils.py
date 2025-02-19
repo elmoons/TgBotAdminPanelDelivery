@@ -3,8 +3,8 @@ from aiogram.types import Message
 from sqlalchemy import select
 
 from src.config import settings
-from src.database import async_session_maker
-from src.models import DataForFinalPrice
+from src.database.database import async_session_maker
+from src.database.models import DataForFinalPrice, ProductsPoizonLinksOrm
 
 ALLOWED_USERS = [int(admin) for admin in settings.ADMIN_TG_IDS.split(",")]
 
@@ -55,3 +55,9 @@ async def get_data_about_price_from_db():
                 "additional_services_price": price.additional_services_price,
             }
         return data_about_prices
+
+
+async def get_all_products_links():
+    async with async_session_maker() as session:
+        query = select(ProductsPoizonLinksOrm)
+        product_links = await session.execute(query)

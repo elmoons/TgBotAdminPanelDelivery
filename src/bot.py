@@ -1,32 +1,27 @@
+from src.config import settings
+from src.database.database import async_session_maker
+from src.database.models import ProductsPoizonLinksOrm
+from src.parse import get_data_about_product, get_spuid
+from src.sheets import add_data_to_sheet, initial
+from src.tasks.tasks import update_all_rows_about_products_in_sheet
+from src.utils import admin_required, get_data_about_price_from_db
+
 import asyncio
 import json
 import logging
 import sys
 
-from aiogram import Bot, Dispatcher
+from aiogram import Bot, Dispatcher, types
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart, Command
-from aiogram.fsm import state
 from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.state import State, StatesGroup
-from sqlalchemy import insert, select
-
-from src.config import settings
-from src.database import async_session_maker
-from src.models import ProductsPoizonLinksOrm, DataForFinalPrice
-from src.parse import get_data_about_product, get_spuid
-from src.sheets import add_data_to_sheet
-from src.utils import check_is_admin, admin_required, get_data_about_price_from_db
+from sqlalchemy import insert
 
 dp = Dispatcher(storage=MemoryStorage())
-
-import gspread
-from gspread import Client, Spreadsheet, Worksheet
-
-from src.config import settings
 
 
 class AddProductStates(StatesGroup):
@@ -48,12 +43,6 @@ async def command_start_handler(message: Message):
 async def message_about_poizon_link(message: Message, state: FSMContext):
     await state.set_state(AddProductStates.link_poizon_product)
     await message.answer("Пришлите ссылку на товар.")
-
-
-def initial():
-    gc: Client = gspread.service_account(".././credentials.json")
-    sh: Spreadsheet = gc.open_by_url(settings.SPREADSHEET_URL)
-    return sh
 
 
 @dp.message(AddProductStates.link_poizon_product)
@@ -80,6 +69,13 @@ async def handle_poizon_link(message: Message, state: FSMContext):
         await state.clear()
 
 
+@dp.message(Command(commands="update_all_products"))
+@admin_required
+async def handle_update_all_rows_in_sheet(message: Message):
+    update_all_rows_about_products_in_sheet.delay()
+    await message.answer("Успешно")
+
+
 @dp.message(Command(commands="get_data_about_price"))
 @admin_required
 async def handle_get_data_about_price(message: Message):
@@ -92,6 +88,18 @@ async def handle_get_data_about_price(message: Message):
         f"Коэф. наценки: {data_about_prices["markup_coefficient"]}\n"
         f"Стоимость доп. услуг: {data_about_prices["additional_services_price"]}\n"
     )
+
+
+@dp.message(Command("google_sheets"))
+@admin_required
+async def handle_get_google_sheets_link(message: Message):
+    web_info = types.WebAppInfo(
+        url="https://docs.google.com/spreadsheets/d/1sNVWABgMkbbRnsB_4biCcE7j2EQqyR3sepjowI2KGrc/edit?gid=0#gid=0"
+    )
+    button1 = types.InlineKeyboardButton(text="Google Sheets", web_app=web_info)
+    markup = types.InlineKeyboardMarkup(inline_keyboard=[[button1]])
+
+    await message.answer("Кнопка для перехода в таблицу", reply_markup=markup)
 
 
 @dp.message()
