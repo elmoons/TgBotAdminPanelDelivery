@@ -1,4 +1,3 @@
-from src.config import settings
 from src.database.database import async_session_maker
 from src.database.models import ProductsPoizonLinksOrm
 from src.parse import get_data_about_product, get_spuid
@@ -6,14 +5,9 @@ from src.sheets import add_data_to_sheet, initial
 from src.tasks.tasks import update_all_rows_about_products_in_sheet
 from src.utils import admin_required, get_data_about_price_from_db
 
-import asyncio
 import json
-import logging
-import sys
 
-from aiogram import Bot, Dispatcher, types
-from aiogram.client.default import DefaultBotProperties
-from aiogram.enums import ParseMode
+from aiogram import Dispatcher, types
 from aiogram.filters import CommandStart, Command
 from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
@@ -84,9 +78,9 @@ async def handle_get_data_about_price(message: Message):
         f"Актуальные данные ценообразования\n"
         f"Цена выкупа: {data_about_prices["redemption_price_in_yuan"]} ¥\n"
         f"Курс ¥ к ₽: {data_about_prices["yuan_to_ruble_exchange_rate"]}\n"
-        f"Стоимость доставки: {data_about_prices["delivery_price"]} ¥\n"
+        f"Стоимость доставки: {data_about_prices["delivery_price"]} ₽\n"
         f"Коэф. наценки: {data_about_prices["markup_coefficient"]}\n"
-        f"Стоимость доп. услуг: {data_about_prices["additional_services_price"]}\n"
+        f"Стоимость доп. услуг: {data_about_prices["additional_services_price"]} ₽\n"
     )
 
 
@@ -108,16 +102,3 @@ async def handle_unknown_message(message: Message):
     await message.answer(
         "Я не понимаю это сообщение. Пожалуйста, используйте команды из меню."
     )
-
-
-async def main() -> None:
-    bot = Bot(
-        token=settings.BOT_TOKEN,
-        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
-    )
-    await dp.start_polling(bot)
-
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, stream=sys.stdout)
-    asyncio.run(main())
