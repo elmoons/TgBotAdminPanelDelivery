@@ -13,101 +13,81 @@ def get_spuid(product_link: str):
 
 def get_data_about_product(spuId: int):
     headers = {"apiKey": settings.POIZON_API_KEY}
-
     params = {"spuId": spuId}
 
+    # Запрос к API (без изменений)
     response = requests.get(
         url="https://poizon-api.com/api/dewu/productDetailWithPrice",
         params=params,
         headers=headers,
     )
+    if response.status_code != 200:
+        raise KeyError(f"API Error: {response.status_code}")
 
-    if response.status_code == 200:
-        data = response.json()
-    else:
-        data = None
+    data = response.json()
+    if not data:
+        return []
 
-    if data:
-        title = data.get("detail", {}).get("title", "")
+    title = data.get("detail", {}).get("title", "")
+    best_configs = {}  # Формат: {(color, memory): {"min_price": float, "sku_data": dict}}
 
-        # Словарь для хранения лучших конфигураций
-        best_configurations = {}
+    # Проходим по всем конфигурациям 1 раз
+    for sku in data.get("skus", []):
+        # 1. Извлекаем цвет и память (уровни 1 и 2)
+        color = None
+        memory = None
+        level_1_name = None
+        level_2_name = None
 
-        for sku in data.get("skus", []):
-            # Формируем ключ конфигурации (цвет + объем памяти)
-            level_1_value = None
-            level_2_value = None
+        for prop in sku.get("properties", []):
+            if prop["level"] == 1:
+                color = prop["saleProperty"]["value"]
+                level_1_name = prop["saleProperty"]["name"]
+            elif prop["level"] == 2:
+                memory = prop["saleProperty"]["value"]
+                level_2_name = prop["saleProperty"]["name"]
 
-            for prop in sku.get("properties", []):
-                if prop["level"] == 1:
-                    level_1_value = prop["saleProperty"]["value"]
-                elif prop["level"] == 2:
-                    level_2_value = prop["saleProperty"]["value"]
+        if not color or not memory:
+            continue  # Пропускаем неполные данные
 
-            config_key = (level_1_value, level_2_value)
+        config_key = (color, memory)
 
-            # Находим минимальную цену для этой конфигурации
-            min_price = None
-            best_price_data = None
+        # 2. Находим минимальную цену в текущем sku
+        min_price_entry = None
+        for price_entry in sku.get("price", {}).get("prices", []):
+            price = price_entry.get("price")
+            if price is None:
+                continue
 
-            if "price" in sku:
-                for price_entry in sku["price"].get("prices", []):
-                    current_price = price_entry.get("price")
-                    if current_price is not None:
-                        if min_price is None or current_price < min_price:
-                            min_price = current_price
-                            best_price_data = {
-                                "tradeType": price_entry.get("tradeType"),
-                                "tradeDesc": price_entry.get("tradeDesc"),
-                                "price": current_price,
-                                "timeDelivery": price_entry.get("timeDelivery"),
-                            }
-
-            # Если для этой конфигурации уже есть запись, сравниваем цены
-            if config_key in best_configurations:
-                if min_price is not None and min_price < best_configurations[config_key]["best_price"]:
-                    best_configurations[config_key] = {
-                        "sku": sku,
-                        "best_price": min_price,
-                        "best_price_data": best_price_data
-                    }
-            elif min_price is not None:
-                best_configurations[config_key] = {
-                    "sku": sku,
-                    "best_price": min_price,
-                    "best_price_data": best_price_data
+            if (min_price_entry is None) or (price < min_price_entry["price"]):
+                min_price_entry = {
+                    "tradeType": price_entry.get("tradeType"),
+                    "tradeDesc": price_entry.get("tradeDesc"),
+                    "price": price,
+                    "timeDelivery": price_entry.get("timeDelivery"),
                 }
 
-        # Формируем итоговый результат только с лучшими конфигурациями
-        result = []
-        for config in best_configurations.values():
-            sku = config["sku"]
-            best_price_data = config["best_price_data"]
+        if not min_price_entry:
+            continue  # Нет подходящих цен
 
-            extracted_data = {
-                "title": title,
+        # 3. Обновляем лучшую конфигурацию
+        if (config_key not in best_configs) or (min_price_entry["price"] < best_configs[config_key]["min_price"]):
+            best_configs[config_key] = {
+                "min_price": min_price_entry["price"],
                 "logoUrl": sku.get("logoUrl"),
-                "level_1": {
-                    "name": None,
-                    "value": None,
-                },
-                "level_2": {
-                    "name": None,
-                    "value": None,
-                },
-                "prices": [best_price_data] if best_price_data else [],
+                "level_1_name": level_1_name,
+                "level_2_name": level_2_name,
+                "price_entry": min_price_entry,
             }
 
-            for prop in sku.get("properties", []):
-                if prop["level"] == 1:
-                    extracted_data["level_1"]["name"] = prop["saleProperty"]["name"]
-                    extracted_data["level_1"]["value"] = prop["saleProperty"]["value"]
-                elif prop["level"] == 2:
-                    extracted_data["level_2"]["name"] = prop["saleProperty"]["name"]
-                    extracted_data["level_2"]["value"] = prop["saleProperty"]["value"]
-
-            result.append(extracted_data)
-
-        return result
-    else:
-        raise KeyError
+    # 4. Формируем результат
+    return [
+        {
+            "title": title,
+            "logoUrl": config["logoUrl"],
+            "level_1": {"name": config["level_1_name"], "value": color},
+            "level_2": {"name": config["level_2_name"], "value": memory},
+            "prices": [config["price_entry"]],
+        }
+        for (color, memory), config in best_configs.items()
+    ]
