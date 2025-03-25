@@ -61,3 +61,7 @@ async def get_all_products_links():
     async with async_session_maker() as session:
         query = select(ProductsPoizonLinksOrm)
         product_links = await session.execute(query)
+        links = [product.link for product in product_links.scalars().all()]
+        return links
+
+

@@ -1,7 +1,5 @@
-import json
-
 import gspread
-from gspread import Client, Spreadsheet, Worksheet
+from gspread import Client, Spreadsheet
 
 from src.config import settings
 from src.utils import final_cost_formula
@@ -13,7 +11,7 @@ def initial():
     return sh
 
 
-async def add_data_to_sheet(sh, data, data_about_prices):
+async def add_data_to_sheet(sh: Spreadsheet, data: list, data_about_prices: dict):
     worksheet = sh.sheet1
 
     rows = []

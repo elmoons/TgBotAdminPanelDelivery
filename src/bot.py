@@ -1,9 +1,10 @@
+from gspread import Spreadsheet
+
 from src.database.database import async_session_maker
 from src.database.models import ProductsPoizonLinksOrm
 from src.parse import get_data_about_product, get_spuid
 from src.sheets import add_data_to_sheet, initial
-from src.tasks.tasks import update_all_rows_about_products_in_sheet
-from src.utils import admin_required, get_data_about_price_from_db
+from src.utils import admin_required, get_data_about_price_from_db, get_all_products_links
 
 import json
 
@@ -66,8 +67,20 @@ async def handle_poizon_link(message: Message, state: FSMContext):
 @dp.message(Command(commands="update_all_products"))
 @admin_required
 async def handle_update_all_rows_in_sheet(message: Message):
-    update_all_rows_about_products_in_sheet.delay()
-    await message.answer("Успешно")
+    sh: Spreadsheet = initial()
+    worksheet = sh.sheet1
+    worksheet.clear()
+    data_about_prices = await get_data_about_price_from_db()
+
+    all_products_links = await get_all_products_links()
+    for i in range(len(all_products_links)):
+        spuid = get_spuid(all_products_links[i])
+        data = get_data_about_product(spuid)
+        json.dumps(data, ensure_ascii=False, indent=4)
+        print(data)
+        await add_data_to_sheet(sh, data, data_about_prices)
+
+    await message.answer("Таблица была успешно обновлена.")
 
 
 @dp.message(Command(commands="get_data_about_price"))
@@ -82,6 +95,16 @@ async def handle_get_data_about_price(message: Message):
         f"Коэф. наценки: {data_about_prices["markup_coefficient"]}\n"
         f"Стоимость доп. услуг: {data_about_prices["additional_services_price"]} ₽\n"
     )
+
+
+@dp.message(Command(commands="get_all_poizon_products_links"))
+@admin_required
+async def handle_get_all_poizon_products_links(message: Message):
+    all_poizon_links_list = await get_all_products_links()
+    all_poizon_links_message = ""
+    for i in range(len(all_poizon_links_list)):
+        all_poizon_links_message += f"{i+1}) {all_poizon_links_list[i]}\n"
+    await message.answer(f"{all_poizon_links_message}")
 
 
 @dp.message(Command("google_sheets"))
