@@ -23,6 +23,10 @@ class AddProductStates(StatesGroup):
     link_poizon_product = State()
 
 
+class ChangeDataPrice(StatesGroup):
+    new_data_about_price = State()
+
+
 @dp.message(CommandStart())
 @admin_required
 async def command_start_handler(message: Message):
@@ -74,10 +78,9 @@ async def handle_update_all_rows_in_sheet(message: Message):
 
     all_products_links = await get_all_products_links()
     for i in range(len(all_products_links)):
-        spuid = get_spuid(all_products_links[i])
+        spuid = get_spuid(all_products_links[i][1])
         data = get_data_about_product(spuid)
         json.dumps(data, ensure_ascii=False, indent=4)
-        print(data)
         await add_data_to_sheet(sh, data, data_about_prices)
 
     await message.answer("Таблица была успешно обновлена.")
@@ -97,13 +100,27 @@ async def handle_get_data_about_price(message: Message):
     )
 
 
+@dp.message(Command(commands="change_data_price"))
+@admin_required
+async def handle_change_data_price(message: Message, state: FSMContext):
+    await state.set_state(ChangeDataPrice.new_data_about_price)
+    await message.answer("Пришлите новые данные для ценообразования.\n"
+                         "Данные предполагают следующий формат:\n")
+
+
+@dp.message(ChangeDataPrice.new_data_about_price)
+@admin_required
+async def handle_new_data_about_price(message: Message, state: FSMContext):
+    ...
+
+
 @dp.message(Command(commands="get_all_poizon_products_links"))
 @admin_required
 async def handle_get_all_poizon_products_links(message: Message):
-    all_poizon_links_list = await get_all_products_links()
+    all_poizon_data_list = await get_all_products_links()
     all_poizon_links_message = ""
-    for i in range(len(all_poizon_links_list)):
-        all_poizon_links_message += f"{i+1}) {all_poizon_links_list[i]}\n"
+    for i in range(len(all_poizon_data_list)):
+        all_poizon_links_message += f"{i+1}) {all_poizon_data_list[i][0]} {all_poizon_data_list[i][1]}\n"
     await message.answer(f"{all_poizon_links_message}")
 
 
