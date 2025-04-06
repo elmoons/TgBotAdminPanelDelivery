@@ -1,3 +1,4 @@
+import aiogram
 from gspread import Spreadsheet
 
 from src.database.database import async_session_maker
@@ -104,14 +105,23 @@ async def handle_get_data_about_price(message: Message):
 @admin_required
 async def handle_change_data_price(message: Message, state: FSMContext):
     await state.set_state(ChangeDataPrice.new_data_about_price)
-    await message.answer("Пришлите новые данные для ценообразования.\n"
-                         "Данные предполагают следующий формат:\n")
+    await message.answer("Пришлите новые данные для ценообразования\.\n"
+                         "Данные предполагают следующий формат\:\n"
+                         """``` b - цена выкупа ¥\n с - курс ¥ к ₽\n d - стоимость доставки ₽\n e - коэффициент наценки\n f - стоимость доп услуг```"""
+                         "Скопируйте фрагмент сообщения и отправьте его вписав все значения переменных\, десятичные числа записываются с точкой\.",
+                         parse_mode=aiogram.enums.parse_mode.ParseMode('MarkdownV2'))
 
 
 @dp.message(ChangeDataPrice.new_data_about_price)
 @admin_required
 async def handle_new_data_about_price(message: Message, state: FSMContext):
-    ...
+    try:
+        print(message.text)
+        # await get_new_data_about_prices(message.text)
+        await message.answer("Принял")
+        await state.clear()
+    except:
+        await message.answer("Неверный формат данных")
 
 
 @dp.message(Command(commands="get_all_poizon_products_links"))
