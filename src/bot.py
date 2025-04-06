@@ -2,7 +2,7 @@ import aiogram
 from gspread import Spreadsheet
 
 from src.database.database import async_session_maker
-from src.database.models import ProductsPoizonLinksOrm
+from src.database.models import ProductsPoizonLinksOrm, DataForFinalPrice
 from src.parse import get_data_about_product, get_spuid
 from src.sheets import add_data_to_sheet, initial
 from src.utils import admin_required, get_data_about_price_from_db, get_all_products_links
@@ -15,7 +15,7 @@ from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.state import State, StatesGroup
-from sqlalchemy import insert
+from sqlalchemy import insert, update
 
 dp = Dispatcher(storage=MemoryStorage())
 
@@ -107,17 +107,28 @@ async def handle_change_data_price(message: Message, state: FSMContext):
     await state.set_state(ChangeDataPrice.new_data_about_price)
     await message.answer("Пришлите новые данные для ценообразования\.\n"
                          "Данные предполагают следующий формат\:\n"
-                         """``` b - цена выкупа ¥\n с - курс ¥ к ₽\n d - стоимость доставки ₽\n e - коэффициент наценки\n f - стоимость доп услуг```"""
-                         "Скопируйте фрагмент сообщения и отправьте его вписав все значения переменных\, десятичные числа записываются с точкой\.",
+                         """``` B - Цена выкупа ¥\n C - Курс ¥ к ₽\n D - Стоимость доставки ₽\n E - Коэффициент наценки\n F - Стоимость дополнительных услуг```"""
+                         "Скопируйте фрагмент сообщения и отправьте его вписав все значения переменных\.",
                          parse_mode=aiogram.enums.parse_mode.ParseMode('MarkdownV2'))
 
 
 @dp.message(ChangeDataPrice.new_data_about_price)
 @admin_required
 async def handle_new_data_about_price(message: Message, state: FSMContext):
+    values = []
+    data_new_price = message.text.split("\n")
+    for i in range(len(data_new_price)):
+        value = data_new_price[i].split("-")[0]
+        values.append(value.strip().replace(",", "."))
     try:
-        print(message.text)
-        # await get_new_data_about_prices(message.text)
+        async with async_session_maker() as session:
+            stmt = update(DataForFinalPrice).values(redemption_price_in_yuan=float(values[0]),
+                                                    yuan_to_ruble_exchange_rate=float(values[1]),
+                                                    delivery_price=float(values[2]),
+                                                    markup_coefficient=float(values[3]),
+                                                    additional_services_price=float(values[4]))
+            await session.execute(stmt)
+            await session.commit()
         await message.answer("Принял")
         await state.clear()
     except:
