@@ -129,10 +129,12 @@ async def handle_new_data_about_price(message: Message, state: FSMContext):
                                                     additional_services_price=float(values[4]))
             await session.execute(stmt)
             await session.commit()
-        await message.answer("Принял")
-        await state.clear()
+        await message.answer("Данные ценообразования успешно изменены.")
     except:
         await message.answer("Неверный формат данных")
+    finally:
+        await state.clear()
+
 
 
 @dp.message(Command(commands="get_all_poizon_products_links"))
