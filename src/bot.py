@@ -136,7 +136,6 @@ async def handle_new_data_about_price(message: Message, state: FSMContext):
         await state.clear()
 
 
-
 @dp.message(Command(commands="get_all_poizon_products_links"))
 @admin_required
 async def handle_get_all_poizon_products_links(message: Message):
