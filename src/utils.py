@@ -42,8 +42,8 @@ def final_cost_formula(a: float, b: float, c: float, d: float, e: float, f: floa
     return final_price
 
 
-async def get_data_about_price_from_db() -> dict:
-    async with async_session_maker() as session:
+async def get_data_about_price_from_db(session_factory) -> dict:
+    async with session_factory() as session:
         query = select(DataForFinalPrice)
         data_price = await session.execute(query)
 
@@ -58,8 +58,8 @@ async def get_data_about_price_from_db() -> dict:
         return data_about_prices
 
 
-async def get_all_products_links() -> list[tuple]:
-    async with async_session_maker() as session:
+async def get_all_products_links(session_factory) -> list[tuple]:
+    async with session_factory() as session:
         query = select(ProductsPoizonLinksOrm)
         product_links = await session.execute(query)
         links = [(product.title, product.link) for product in product_links.scalars().all()]
