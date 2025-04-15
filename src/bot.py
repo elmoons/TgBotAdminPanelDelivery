@@ -60,7 +60,7 @@ async def handle_poizon_link(message: Message, state: FSMContext):
                 title=data[0]["title"], link=message.text
             )
             await session.execute(stmt_product_add)
-            data_about_prices = await get_data_about_price_from_db()
+            data_about_prices = await get_data_about_price_from_db(async_session_maker)
 
             await session.commit()
             await add_data_to_sheet(initial(), data, data_about_prices)
@@ -75,9 +75,9 @@ async def handle_update_all_rows_in_sheet(message: Message):
     sh: Spreadsheet = initial()
     worksheet = sh.sheet1
     worksheet.clear()
-    data_about_prices = await get_data_about_price_from_db()
+    data_about_prices = await get_data_about_price_from_db(async_session_maker)
 
-    all_products_links = await get_all_products_links()
+    all_products_links = await get_all_products_links(async_session_maker)
     for i in range(len(all_products_links)):
         spuid = get_spuid(all_products_links[i][1])
         data = get_data_about_product(spuid)
@@ -90,7 +90,7 @@ async def handle_update_all_rows_in_sheet(message: Message):
 @dp.message(Command(commands="get_data_about_price"))
 @admin_required
 async def handle_get_data_about_price(message: Message):
-    data_about_prices = await get_data_about_price_from_db()
+    data_about_prices = await get_data_about_price_from_db(async_session_maker)
     await message.answer(
         f"Актуальные данные ценообразования\n"
         f"Цена выкупа: {data_about_prices["redemption_price_in_yuan"]} ¥\n"
@@ -139,7 +139,7 @@ async def handle_new_data_about_price(message: Message, state: FSMContext):
 @dp.message(Command(commands="get_all_poizon_products_links"))
 @admin_required
 async def handle_get_all_poizon_products_links(message: Message):
-    all_poizon_data_list = await get_all_products_links()
+    all_poizon_data_list = await get_all_products_links(async_session_maker)
     all_poizon_links_message = ""
     for i in range(len(all_poizon_data_list)):
         all_poizon_links_message += f"{i+1}) {all_poizon_data_list[i][0]} {all_poizon_data_list[i][1]}\n"
