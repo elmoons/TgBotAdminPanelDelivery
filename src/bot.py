@@ -3,6 +3,7 @@ from gspread import Spreadsheet
 
 from src.database.database import async_session_maker
 from src.database.models import ProductsPoizonLinksOrm, DataForFinalPrice
+from src.exceptions import NotDataAboutPrice
 from src.parse import get_data_about_product, get_spuid
 from src.sheets import add_data_to_sheet, initial
 from src.utils import admin_required, get_data_about_price_from_db, get_all_products_links
@@ -15,7 +16,7 @@ from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.state import State, StatesGroup
-from sqlalchemy import insert, update
+from sqlalchemy import insert, update, delete
 
 dp = Dispatcher(storage=MemoryStorage())
 
@@ -45,6 +46,7 @@ async def message_about_poizon_link(message: Message, state: FSMContext):
     await message.answer("Пришлите ссылку на товар.")
 
 
+
 @dp.message(AddProductStates.link_poizon_product)
 @admin_required
 async def handle_poizon_link(message: Message, state: FSMContext):
@@ -60,11 +62,14 @@ async def handle_poizon_link(message: Message, state: FSMContext):
                 title=data[0]["title"], link=message.text
             )
             await session.execute(stmt_product_add)
-            data_about_prices = await get_data_about_price_from_db(async_session_maker)
-
-            await session.commit()
-            await add_data_to_sheet(initial(), data, data_about_prices)
-            await message.answer(f"Данные товара с Poizon успешно получены.")
+            try:
+                data_about_prices = await get_data_about_price_from_db(async_session_maker)
+            except NotDataAboutPrice as e:
+                await message.answer(e.detail)
+            else:
+                await session.commit()
+                await add_data_to_sheet(initial(), data, data_about_prices)
+                await message.answer(f"Данные товара с Poizon успешно получены.")
     finally:
         await state.clear()
 
@@ -90,15 +95,18 @@ async def handle_update_all_rows_in_sheet(message: Message):
 @dp.message(Command(commands="get_data_about_price"))
 @admin_required
 async def handle_get_data_about_price(message: Message):
-    data_about_prices = await get_data_about_price_from_db(async_session_maker)
-    await message.answer(
-        f"Актуальные данные ценообразования\n"
-        f"Цена выкупа: {data_about_prices["redemption_price_in_yuan"]} ¥\n"
-        f"Курс ¥ к ₽: {data_about_prices["yuan_to_ruble_exchange_rate"]}\n"
-        f"Стоимость доставки: {data_about_prices["delivery_price"]} ₽\n"
-        f"Коэф. наценки: {data_about_prices["markup_coefficient"]}\n"
-        f"Стоимость доп. услуг: {data_about_prices["additional_services_price"]} ₽\n"
-    )
+    try:
+        data_about_prices = await get_data_about_price_from_db(async_session_maker)
+        await message.answer(
+            f"Актуальные данные ценообразования\n"
+            f"Цена выкупа: {data_about_prices["redemption_price_in_yuan"]} ¥\n"
+            f"Курс ¥ к ₽: {data_about_prices["yuan_to_ruble_exchange_rate"]}\n"
+            f"Стоимость доставки: {data_about_prices["delivery_price"]} ₽\n"
+            f"Коэф. наценки: {data_about_prices["markup_coefficient"]}\n"
+            f"Стоимость доп. услуг: {data_about_prices["additional_services_price"]} ₽\n"
+        )
+    except NotDataAboutPrice as e:
+        await message.answer(str(e.detail))
 
 
 @dp.message(Command(commands="change_data_price"))
@@ -122,16 +130,19 @@ async def handle_new_data_about_price(message: Message, state: FSMContext):
         values.append(value.strip().replace(",", "."))
     try:
         async with async_session_maker() as session:
-            stmt = update(DataForFinalPrice).values(redemption_price_in_yuan=float(values[0]),
+            delete_stmt = delete(DataForFinalPrice)
+            await session.execute(delete_stmt)
+            add_stmt = insert(DataForFinalPrice).values(redemption_price_in_yuan=float(values[0]),
                                                     yuan_to_ruble_exchange_rate=float(values[1]),
                                                     delivery_price=float(values[2]),
                                                     markup_coefficient=float(values[3]),
                                                     additional_services_price=float(values[4]))
-            await session.execute(stmt)
+            await session.execute(add_stmt)
             await session.commit()
         await message.answer("Данные ценообразования успешно изменены.")
-    except:
+    except Exception as e:
         await message.answer("Неверный формат данных")
+        print(e)
     finally:
         await state.clear()
 

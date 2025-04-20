@@ -6,6 +6,7 @@ from sqlalchemy import select
 from src.config import settings
 from src.database.database import async_session_maker
 from src.database.models import DataForFinalPrice, ProductsPoizonLinksOrm
+from src.exceptions import NotDataAboutPrice
 
 ALLOWED_USERS = [int(admin) for admin in settings.ADMIN_TG_IDS.split(",")]
 
@@ -45,16 +46,17 @@ def final_cost_formula(a: float, b: float, c: float, d: float, e: float, f: floa
 async def get_data_about_price_from_db(session_factory) -> dict:
     async with session_factory() as session:
         query = select(DataForFinalPrice)
-        data_price = await session.execute(query)
-
-        for price in data_price.first():
-            data_about_prices = {
-                "redemption_price_in_yuan": price.redemption_price_in_yuan,
-                "yuan_to_ruble_exchange_rate": price.yuan_to_ruble_exchange_rate,
-                "delivery_price": price.delivery_price,
-                "markup_coefficient": price.markup_coefficient,
-                "additional_services_price": price.additional_services_price,
-            }
+        result = await session.execute(query)
+        price = result.scalars().first()  # Вот это изменение
+        if price is None:
+            raise NotDataAboutPrice()
+        data_about_prices = {
+            "redemption_price_in_yuan": price.redemption_price_in_yuan,
+            "yuan_to_ruble_exchange_rate": price.yuan_to_ruble_exchange_rate,
+            "delivery_price": price.delivery_price,
+            "markup_coefficient": price.markup_coefficient,
+            "additional_services_price": price.additional_services_price,
+        }
         return data_about_prices
 
 
