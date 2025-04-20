@@ -3,7 +3,7 @@ from gspread import Spreadsheet
 
 from src.database.database import async_session_maker
 from src.database.models import ProductsPoizonLinksOrm, DataForFinalPrice
-from src.exceptions import NotDataAboutPrice
+from src.exceptions import NotDataAboutPrice, NotDataAboutProducts
 from src.parse import get_data_about_product, get_spuid
 from src.sheets import add_data_to_sheet, initial
 from src.utils import admin_required, get_data_about_price_from_db, get_all_products_links
@@ -80,16 +80,21 @@ async def handle_update_all_rows_in_sheet(message: Message):
     sh: Spreadsheet = initial()
     worksheet = sh.sheet1
     worksheet.clear()
-    data_about_prices = await get_data_about_price_from_db(async_session_maker)
+    try:
+        data_about_prices = await get_data_about_price_from_db(async_session_maker)
+        all_products_links = await get_all_products_links(async_session_maker)
+    except NotDataAboutPrice as e:
+        await message.answer(str(e.detail))
+    except NotDataAboutProducts as e:
+        await message.answer(str(e.detail))
+    else:
+        for i in range(len(all_products_links)):
+            spuid = get_spuid(all_products_links[i][1])
+            data = get_data_about_product(spuid)
+            json.dumps(data, ensure_ascii=False, indent=4)
+            await add_data_to_sheet(sh, data, data_about_prices)
 
-    all_products_links = await get_all_products_links(async_session_maker)
-    for i in range(len(all_products_links)):
-        spuid = get_spuid(all_products_links[i][1])
-        data = get_data_about_product(spuid)
-        json.dumps(data, ensure_ascii=False, indent=4)
-        await add_data_to_sheet(sh, data, data_about_prices)
-
-    await message.answer("Таблица была успешно обновлена.")
+        await message.answer("Таблица была успешно обновлена.")
 
 
 @dp.message(Command(commands="get_data_about_price"))
@@ -150,11 +155,15 @@ async def handle_new_data_about_price(message: Message, state: FSMContext):
 @dp.message(Command(commands="get_all_poizon_products_links"))
 @admin_required
 async def handle_get_all_poizon_products_links(message: Message):
-    all_poizon_data_list = await get_all_products_links(async_session_maker)
-    all_poizon_links_message = ""
-    for i in range(len(all_poizon_data_list)):
-        all_poizon_links_message += f"{i+1}) {all_poizon_data_list[i][0]} {all_poizon_data_list[i][1]}\n"
-    await message.answer(f"{all_poizon_links_message}")
+    try:
+        all_poizon_data_list = await get_all_products_links(async_session_maker)
+    except NotDataAboutProducts as e:
+        await message.answer(str(e.detail))
+    else:
+        all_poizon_links_message = ""
+        for i in range(len(all_poizon_data_list)):
+            all_poizon_links_message += f"{i+1}) {all_poizon_data_list[i][0]} {all_poizon_data_list[i][1]}\n"
+        await message.answer(f"{all_poizon_links_message}")
 
 
 @dp.message(Command("google_sheets"))

@@ -6,7 +6,7 @@ from sqlalchemy import select
 from src.config import settings
 from src.database.database import async_session_maker
 from src.database.models import DataForFinalPrice, ProductsPoizonLinksOrm
-from src.exceptions import NotDataAboutPrice
+from src.exceptions import NotDataAboutPrice, NotDataAboutProducts
 
 ALLOWED_USERS = [int(admin) for admin in settings.ADMIN_TG_IDS.split(",")]
 
@@ -49,7 +49,7 @@ async def get_data_about_price_from_db(session_factory) -> dict:
         result = await session.execute(query)
         price = result.scalars().first()  # Вот это изменение
         if price is None:
-            raise NotDataAboutPrice()
+            raise NotDataAboutPrice
         data_about_prices = {
             "redemption_price_in_yuan": price.redemption_price_in_yuan,
             "yuan_to_ruble_exchange_rate": price.yuan_to_ruble_exchange_rate,
@@ -63,9 +63,11 @@ async def get_data_about_price_from_db(session_factory) -> dict:
 async def get_all_products_links(session_factory) -> list[tuple]:
     async with session_factory() as session:
         query = select(ProductsPoizonLinksOrm)
-        product_links = await session.execute(query)
-        links = [(product.title, product.link) for product in product_links.scalars().all()]
-
+        result = await session.execute(query)
+        product_links = result.scalars().all()
+        if not product_links:
+            raise NotDataAboutProducts
+        links = [(product.title, product.link) for product in product_links]
         return links
 
 
