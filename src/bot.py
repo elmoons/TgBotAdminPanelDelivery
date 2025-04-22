@@ -5,7 +5,7 @@ from src.database.database import async_session_maker
 from src.database.models import ProductsPoizonLinksOrm, DataForFinalPrice
 from src.exceptions import NotDataAboutPrice, NotDataAboutProducts
 from src.parse import get_data_about_product, get_spuid
-from src.sheets import add_data_to_sheet, initial
+from src.sheets import add_data_to_sheet, initial_sheets
 from src.utils import admin_required, get_data_about_price_from_db, get_all_products_links
 
 import json
@@ -16,7 +16,7 @@ from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.state import State, StatesGroup
-from sqlalchemy import insert, update, delete
+from sqlalchemy import insert, delete
 
 dp = Dispatcher(storage=MemoryStorage())
 
@@ -68,7 +68,7 @@ async def handle_poizon_link(message: Message, state: FSMContext):
                 await message.answer(e.detail)
             else:
                 await session.commit()
-                await add_data_to_sheet(initial(), data, data_about_prices)
+                await add_data_to_sheet(initial_sheets(), data, data_about_prices)
                 await message.answer(f"Данные товара с Poizon успешно получены.")
     finally:
         await state.clear()
@@ -77,7 +77,7 @@ async def handle_poizon_link(message: Message, state: FSMContext):
 @dp.message(Command(commands="update_all_products"))
 @admin_required
 async def handle_update_all_rows_in_sheet(message: Message):
-    sh: Spreadsheet = initial()
+    sh: Spreadsheet = initial_sheets()
     worksheet = sh.sheet1
     worksheet.clear()
     try:

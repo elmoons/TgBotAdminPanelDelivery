@@ -4,7 +4,6 @@ from gspread import Spreadsheet
 from sqlalchemy import select
 
 from src.config import settings
-from src.database.database import async_session_maker
 from src.database.models import DataForFinalPrice, ProductsPoizonLinksOrm
 from src.exceptions import NotDataAboutPrice, NotDataAboutProducts
 
@@ -22,21 +21,21 @@ def admin_required(handler):
             return await handler(message, *args, **kwargs)
         else:
             await message.answer("You can't use this bot.")
-
     return wrapper
 
-
 """
-(((a+b)*c)+d)*e+f
+Формула расчета итоговой стоимости:
+    (((a + b) * c) + d) * e + f
 
-а-цена в юанях
-b-цена выкупа в юанях
-с-курс юаня
-d-стоимость доставки
-e- кеф наценки
-f-стоимость доп услуг(разблокировки гравировки или чего-то подобного) они не на всех позициях
+Где:
+    a - Цена товара в юанях
+    b - Цена выкупа товара в юанях
+    c - Текущий курс юаня к рублю
+    d - Стоимость доставки
+    e - Коэффициент наценки
+    f - Стоимость дополнительных услуг (опционально)
+        (разблокировка, гравировка и т.п.)
 """
-
 
 def final_cost_formula(a: float, b: float, c: float, d: float, e: float, f: float) -> float:
     final_price = (((a + b) * c) + d) * e + f

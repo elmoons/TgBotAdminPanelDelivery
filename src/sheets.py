@@ -1,13 +1,17 @@
+import os
+
 import gspread
-from gspread import Client, Spreadsheet
+from gspread import Spreadsheet
 
 from src.config import settings
 from src.utils import final_cost_formula
 
 
-def initial():
-    gc: Client = gspread.service_account(".././credentials.json")
-    sh: Spreadsheet = gc.open_by_url(settings.SPREADSHEET_URL)
+def initial_sheets():
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    creds_path = os.path.join(current_dir, "../credentials.json")
+    gc = gspread.service_account(creds_path)
+    sh = gc.open_by_url(settings.SPREADSHEET_URL)
     return sh
 
 
