@@ -19,7 +19,12 @@ docker run --name tg_panel \
     --network=myNetwork \
     tg_panel_image
 
-docker run --name panel_celery \
+docker run --name panel_celery_worker \
+    --network=myNetwork \
+    tg_panel_image \
+    celery --app=src.tasks.celery_app:celery_instance worker -l INFO
+
+docker run --name panel_celery_beat \
     --network=myNetwork \
     tg_panel_image \
     celery --app=src.tasks.celery_app:celery_instance worker -l INFO -B

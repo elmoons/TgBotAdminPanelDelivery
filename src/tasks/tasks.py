@@ -8,7 +8,7 @@ from gspread import Spreadsheet
 
 from src.config import settings
 from src.database.database import async_session_maker_null_pool
-from src.exceptions import NotDataAboutPrice
+from src.exceptions import NotDataAboutPrice, NotDataAboutProducts
 
 from src.parse import get_spuid, get_data_about_product
 from src.sheets import add_data_to_sheet
@@ -34,6 +34,8 @@ def update_all_rows_about_products_in_sheet():
         data_about_prices = asyncio.run(get_data_about_price_from_db(async_session_maker_null_pool))
     except NotDataAboutPrice:
         logging.warning("Не удалось запустить задачу по обновлению таблицы, на были получены данные о ценообразовании.")
+    except NotDataAboutProducts:
+        logging.warning("Не удалось запустить задачу по обновлению таблицы, на были получены данные о добавленных товарах.")
     else:
         all_products_links = asyncio.run(get_all_products_links(async_session_maker_null_pool))
         for i in range(len(all_products_links)):
