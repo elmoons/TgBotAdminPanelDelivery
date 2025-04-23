@@ -1,0 +1,33 @@
+services:
+  tg_panel_service:
+    container_name: 'tg_panel'
+    build:
+      context: .
+    networks:
+      - myNetwork
+    env_file:
+      - .env
+
+  panel_celery_worker_service:
+    container_name: 'panel_celery_worker'
+    build:
+      context: .
+    networks:
+      - myNetwork
+    env_file:
+      - .env
+    command: "celery --app=src.tasks.celery_app:celery_instance worker -l INFO"
+
+  panel_celery_beat_service:
+    container_name: 'panel_celery_beat'
+    build:
+      context: .
+    networks:
+      - myNetwork
+    env_file:
+      - .env
+    command: "celery --app=src.tasks.celery_app:celery_instance beat -l INFO -B"
+
+networks:
+  myNetwork:
+    external: true
