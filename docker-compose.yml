@@ -1,8 +1,32 @@
 services:
+
+  panel_db_service:
+    container_name: 'panel_db'
+    image: postgres:16
+    environment:
+      POSTGRES_USER: abcde
+      POSTGRES_PASSWORD: abcde
+      POSTGRES_DB: postgres
+    networks:
+      - myNetwork
+    volumes:
+      - pg-panel-data:/var/lib/postgresql/data
+    ports:
+      - "6432:5432"
+
+  panel_broker_service:
+    container_name: 'panel_broker'
+    image: redis:latest
+    networks:
+      - myNetwork
+    ports:
+      - "7379:6379"
+
   tg_panel_service:
     container_name: 'tg_panel'
     build:
       context: .
+      dockerfile: Dockerfile
     networks:
       - myNetwork
     env_file:
@@ -26,8 +50,11 @@ services:
       - myNetwork
     env_file:
       - .env
-    command: "celery --app=src.tasks.celery_app:celery_instance beat -l INFO -B"
+    command: "celery --app=src.tasks.celery_app:celery_instance beat -l INFO"
 
 networks:
   myNetwork:
     external: true
+
+volumes:
+  pg-panel-data:
