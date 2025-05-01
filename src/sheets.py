@@ -34,11 +34,9 @@ async def add_data_to_sheet(sh: Spreadsheet, data: list, data_about_prices: dict
 
             result_price = final_cost_formula(
                 a=price,
-                b=data_about_prices["redemption_price_in_yuan"],
+                b=data_about_prices["delivery_price_in_yuan"],
                 c=data_about_prices["yuan_to_ruble_exchange_rate"],
-                d=data_about_prices["delivery_price"],
-                e=data_about_prices["markup_coefficient"],
-                f=data_about_prices["additional_services_price"],
+                d=data_about_prices["markup_coefficient"],
             )
 
             rows.append(

@@ -34,8 +34,8 @@ def admin_required(handler):
     d - Коэффициент наценки
 """
 
-def final_cost_formula(a: float, b: float, c: float, d: float, e: float, f: float) -> float:
-    final_price = (((a + b) * c) + d) * e + f
+def final_cost_formula(a: float, b: float, c: float, d: float) -> float:
+    final_price = (((a + b) * c) * d)
     return final_price
 
 
@@ -43,15 +43,13 @@ async def get_data_about_price_from_db(session_factory) -> dict:
     async with session_factory() as session:
         query = select(DataForFinalPrice)
         result = await session.execute(query)
-        price = result.scalars().first()  # Вот это изменение
+        price = result.scalars().first()
         if price is None:
             raise NotDataAboutPrice
         data_about_prices = {
-            "redemption_price_in_yuan": price.redemption_price_in_yuan,
+            "delivery_price_in_yuan": price.delivery_price_in_yuan,
             "yuan_to_ruble_exchange_rate": price.yuan_to_ruble_exchange_rate,
-            "delivery_price": price.delivery_price,
             "markup_coefficient": price.markup_coefficient,
-            "additional_services_price": price.additional_services_price,
         }
         return data_about_prices
 
@@ -86,11 +84,9 @@ def add_data_to_sheet_sync(sh: Spreadsheet, data: list, data_about_prices: dict)
 
             result_price = final_cost_formula(
                 a=price,
-                b=data_about_prices["redemption_price_in_yuan"],
+                b=data_about_prices["delivery_price_in_yuan"],
                 c=data_about_prices["yuan_to_ruble_exchange_rate"],
-                d=data_about_prices["delivery_price"],
-                e=data_about_prices["markup_coefficient"],
-                f=data_about_prices["additional_services_price"],
+                d=data_about_prices["markup_coefficient"],
             )
 
             rows.append(
@@ -103,7 +99,7 @@ def add_data_to_sheet_sync(sh: Spreadsheet, data: list, data_about_prices: dict)
                     trade_desc,
                     f"От {min_delivery} дней",
                     f"До {max_delivery} дней",
-                    f"Итог: {round(result_price, 2)} ₽",
+                    f"Итог: {result_price} ₽",
                 ]
             )
 

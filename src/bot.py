@@ -104,7 +104,7 @@ async def handle_get_data_about_price(message: Message):
         data_about_prices = await get_data_about_price_from_db(async_session_maker)
         await message.answer(
             f"Актуальные данные ценообразования\n"
-            f"Стоимость доставки: {data_about_prices["delivery_price_in_yuan"]} ₽\n"
+            f"Стоимость доставки: {data_about_prices["delivery_price_in_yuan"]} ¥\n"
             f"Курс ¥ к ₽: {data_about_prices["yuan_to_ruble_exchange_rate"]}\n"
             f"Коэф. наценки: {data_about_prices["markup_coefficient"]}\n"
         )
@@ -118,7 +118,7 @@ async def handle_change_data_price(message: Message, state: FSMContext):
     await state.set_state(ChangeDataPrice.new_data_about_price)
     await message.answer("Пришлите новые данные для ценообразования\.\n"
                          "Данные предполагают следующий формат\:\n"
-                         """``` B - Цена достаки ¥\n C - Курс ¥ к ₽\n D -  Коэффициент наценки ₽```"""
+                         """``` B - Цена достаки ¥\n C - Курс ¥ к ₽\n D - Коэффициент наценки ₽```"""
                          "Скопируйте фрагмент сообщения и отправьте его вписав все значения переменных\.",
                          parse_mode=aiogram.enums.parse_mode.ParseMode('MarkdownV2'))
 
@@ -135,17 +135,15 @@ async def handle_new_data_about_price(message: Message, state: FSMContext):
         async with async_session_maker() as session:
             delete_stmt = delete(DataForFinalPrice)
             await session.execute(delete_stmt)
-            add_stmt = insert(DataForFinalPrice).values(redemption_price_in_yuan=float(values[0]),
-                                                    yuan_to_ruble_exchange_rate=float(values[1]),
-                                                    delivery_price=float(values[2]),
-                                                    markup_coefficient=float(values[3]),
-                                                    additional_services_price=float(values[4]))
+            add_stmt = insert(DataForFinalPrice).values(
+            delivery_price_in_yuan=float(values[0]),
+            yuan_to_ruble_exchange_rate=float(values[1]),
+            markup_coefficient=float(values[2]))
             await session.execute(add_stmt)
             await session.commit()
         await message.answer("Данные ценообразования успешно изменены.")
     except Exception as e:
         await message.answer("Неверный формат данных")
-        print(e)
     finally:
         await state.clear()
 
