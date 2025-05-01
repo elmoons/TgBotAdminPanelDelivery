@@ -104,11 +104,9 @@ async def handle_get_data_about_price(message: Message):
         data_about_prices = await get_data_about_price_from_db(async_session_maker)
         await message.answer(
             f"Актуальные данные ценообразования\n"
-            f"Цена выкупа: {data_about_prices["redemption_price_in_yuan"]} ¥\n"
+            f"Стоимость доставки: {data_about_prices["delivery_price_in_yuan"]} ₽\n"
             f"Курс ¥ к ₽: {data_about_prices["yuan_to_ruble_exchange_rate"]}\n"
-            f"Стоимость доставки: {data_about_prices["delivery_price"]} ₽\n"
             f"Коэф. наценки: {data_about_prices["markup_coefficient"]}\n"
-            f"Стоимость доп. услуг: {data_about_prices["additional_services_price"]} ₽\n"
         )
     except NotDataAboutPrice as e:
         await message.answer(str(e.detail))
@@ -120,7 +118,7 @@ async def handle_change_data_price(message: Message, state: FSMContext):
     await state.set_state(ChangeDataPrice.new_data_about_price)
     await message.answer("Пришлите новые данные для ценообразования\.\n"
                          "Данные предполагают следующий формат\:\n"
-                         """``` B - Цена выкупа ¥\n C - Курс ¥ к ₽\n D - Стоимость доставки ₽\n E - Коэффициент наценки\n F - Стоимость дополнительных услуг```"""
+                         """``` B - Цена достаки ¥\n C - Курс ¥ к ₽\n D -  Коэффициент наценки ₽```"""
                          "Скопируйте фрагмент сообщения и отправьте его вписав все значения переменных\.",
                          parse_mode=aiogram.enums.parse_mode.ParseMode('MarkdownV2'))
 
