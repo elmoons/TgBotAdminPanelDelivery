@@ -118,7 +118,7 @@ async def handle_change_data_price(message: Message, state: FSMContext):
     await state.set_state(ChangeDataPrice.new_data_about_price)
     await message.answer("Пришлите новые данные для ценообразования\.\n"
                          "Данные предполагают следующий формат\:\n"
-                         """``` B - Цена достаки ¥\n C - Курс ¥ к ₽\n D - Коэффициент наценки ₽```"""
+                         """``` B - Цена доставки ¥\n C - Курс ¥ к ₽\n D - Коэффициент наценки ₽```"""
                          "Скопируйте фрагмент сообщения и отправьте его вписав все значения переменных\.",
                          parse_mode=aiogram.enums.parse_mode.ParseMode('MarkdownV2'))
 
