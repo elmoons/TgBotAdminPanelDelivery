@@ -10,9 +10,9 @@ from src.utils import admin_required, get_data_about_price_from_db, get_all_prod
 
 import json
 
-from aiogram import Dispatcher, types
+from aiogram import Dispatcher, types, Bot
 from aiogram.filters import CommandStart, Command
-from aiogram.types import Message
+from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.state import State, StatesGroup
@@ -148,18 +148,84 @@ async def handle_new_data_about_price(message: Message, state: FSMContext):
         await state.clear()
 
 
+async def show_products_page(bot: Bot, chat_id: int, message_id: int, page: int, items: list):
+    count_of_items = 10
+    start_idx = page * count_of_items
+    end_idx = start_idx + count_of_items
+    page_items = items[start_idx:end_idx]
+
+    message_text = ""
+
+    for idx, (link, name) in enumerate(page_items, start=start_idx+1):
+        message_text += f"{idx}) {name}\n{link}\n\n"
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[])
+
+    if page > 0:
+        keyboard.inline_keyboard.append([
+            InlineKeyboardButton(text="⬅️ Назад", callback_data=f"prev_{page}")
+        ])
+
+    if end_idx < len(items):
+        keyboard.inline_keyboard.append([
+            InlineKeyboardButton(text="Вперед ➡️", callback_data=f"next_{page}")
+        ])
+
+    await bot.edit_message_text(
+        chat_id=chat_id,
+        message_id=message_id,
+        text=message_text,
+        reply_markup=keyboard
+    )
+
+
 @dp.message(Command(commands="get_all_poizon_products_links"))
 @admin_required
-async def handle_get_all_poizon_products_links(message: Message):
+async def handle_get_all_poizon_products_links(message: Message, state: FSMContext):
     try:
         all_poizon_data_list = await get_all_products_links(async_session_maker)
     except NotDataAboutProducts as e:
         await message.answer(str(e.detail))
     else:
-        all_poizon_links_message = ""
-        for i in range(len(all_poizon_data_list)):
-            all_poizon_links_message += f"{i+1}) {all_poizon_data_list[i][0]} {all_poizon_data_list[i][1]}\n"
-        await message.answer(f"{all_poizon_links_message}")
+        sent_message = await message.answer("Загрузка списка товаров...")
+
+        await state.update_data(
+            all_items = all_poizon_data_list,
+            current_page=0,
+            message_id=sent_message.message_id
+        )
+
+        await show_products_page(
+            bot=message.bot,
+            chat_id=message.chat.id,
+            message_id=sent_message.message_id,
+            items=all_poizon_data_list,
+            page=0
+        )
+
+
+@dp.callback_query(lambda c: c.data.startswith(("prev_", "next_")))
+async def process_page_switch(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    all_items = data["all_items"]
+    current_page = int(callback.data.split("_")[1])
+    message_id = data["message_id"]
+
+    if callback.data.startswith("prev_"):
+        new_page = current_page - 1
+    else:
+        new_page = current_page + 1
+
+    await state.update_data(current_page=new_page)
+
+    await show_products_page(
+        bot=callback.bot,
+        chat_id=callback.message.chat.id,
+        message_id=message_id,
+        items=all_items,
+        page=new_page
+    )
+    await callback.answer()
 
 
 @dp.message(Command("google_sheets"))
