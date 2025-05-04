@@ -173,7 +173,7 @@ async def handle_get_data_about_price(message: Message):
             f"Актуальные данные ценообразования\n"
             f"Стоимость доставки: {data_about_prices["delivery_price_in_yuan"]} ¥\n"
             f"Курс ¥ к ₽: {data_about_prices["yuan_to_ruble_exchange_rate"]}\n"
-            f"Коэф. наценки: {data_about_prices["markup_coefficient"]}\n"
+            f"Коэффициент наценки: {data_about_prices["markup_coefficient"]}\n"
         )
     except NotDataAboutPrice as e:
         await message.answer(str(e.detail))
@@ -280,26 +280,29 @@ async def handle_get_all_poizon_products_links(message: Message, state: FSMConte
 
 @dp.callback_query(lambda c: c.data.startswith(("prev_", "next_")))
 async def process_page_switch(callback: CallbackQuery, state: FSMContext):
-    data = await state.get_data()
-    all_items = data["all_items"]
-    current_page = int(callback.data.split("_")[1])
-    message_id = data["message_id"]
-
-    if callback.data.startswith("prev_"):
-        new_page = current_page - 1
+    try:
+        data = await state.get_data()
+        all_items = data["all_items"]
+        current_page = int(callback.data.split("_")[1])
+        message_id = data["message_id"]
+    except KeyError:
+        await callback.answer("Данное сообщение устарело, используйте комманды.")
     else:
-        new_page = current_page + 1
+        if callback.data.startswith("prev_"):
+            new_page = current_page - 1
+        else:
+            new_page = current_page + 1
 
-    await state.update_data(current_page=new_page)
+        await state.update_data(current_page=new_page)
 
-    await show_products_page(
-        bot=callback.bot,
-        chat_id=callback.message.chat.id,
-        message_id=message_id,
-        items=all_items,
-        page=new_page,
-    )
-    await callback.answer()
+        await show_products_page(
+            bot=callback.bot,
+            chat_id=callback.message.chat.id,
+            message_id=message_id,
+            items=all_items,
+            page=new_page,
+        )
+        await callback.answer()
 
 
 @dp.message(Command("google_sheets"))
