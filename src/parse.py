@@ -72,7 +72,9 @@ def get_data_about_product(spuId: int):
         if not min_price_entry:
             continue
 
-        if (config_key not in best_configs) or (min_price_entry["price"] < best_configs[config_key]["min_price"]):
+        if (config_key not in best_configs) or (
+            min_price_entry["price"] < best_configs[config_key]["min_price"]
+        ):
             best_configs[config_key] = {
                 "min_price": min_price_entry["price"],
                 "logoUrl": sku.get("logoUrl"),

@@ -6,23 +6,37 @@ from src.database.models import ProductsPoizonLinksOrm, DataForFinalPrice
 from src.exceptions import NotDataAboutPrice, NotDataAboutProducts
 from src.parse import get_data_about_product, get_spuid
 from src.sheets import add_data_to_sheet, initial_sheets
-from src.utils import admin_required, get_data_about_price_from_db, get_all_products_links
+from src.tasks.tasks import update_all_rows_about_products_in_sheet
+from src.utils import (
+    admin_required,
+    get_data_about_price_from_db,
+    get_all_products_links,
+)
 
 import json
 
 from aiogram import Dispatcher, types, Bot
 from aiogram.filters import CommandStart, Command
-from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
+from aiogram.types import (
+    Message,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    CallbackQuery,
+)
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.state import State, StatesGroup
-from sqlalchemy import insert, delete
+from sqlalchemy import insert, select, delete, func
 
 dp = Dispatcher(storage=MemoryStorage())
 
 
 class AddProductStates(StatesGroup):
     link_poizon_product = State()
+
+
+class DeleteProductsStates(StatesGroup):
+    number_poizon_product = State()
 
 
 class ChangeDataPrice(StatesGroup):
@@ -41,10 +55,9 @@ async def command_start_handler(message: Message):
 
 @dp.message(Command(commands="add_poizon_product"))
 @admin_required
-async def message_about_poizon_link(message: Message, state: FSMContext):
+async def handle_command_add_poizon_product(message: Message, state: FSMContext):
     await state.set_state(AddProductStates.link_poizon_product)
     await message.answer("Пришлите ссылку на товар.")
-
 
 
 @dp.message(AddProductStates.link_poizon_product)
@@ -63,13 +76,69 @@ async def handle_poizon_link(message: Message, state: FSMContext):
             )
             await session.execute(stmt_product_add)
             try:
-                data_about_prices = await get_data_about_price_from_db(async_session_maker)
+                data_about_prices = await get_data_about_price_from_db(
+                    async_session_maker
+                )
             except NotDataAboutPrice as e:
                 await message.answer(e.detail)
             else:
                 await session.commit()
                 await add_data_to_sheet(initial_sheets(), data, data_about_prices)
                 await message.answer(f"Данные товара с Poizon успешно получены.")
+    finally:
+        await state.clear()
+
+
+@dp.message(Command(commands="delete_poizon_product"))
+@admin_required
+async def handle_command_delete_poizon_product(message: Message, state: FSMContext):
+    await state.set_state(DeleteProductsStates.number_poizon_product)
+    await message.answer("Выберете номер товара который хотите удалить.")
+
+
+@dp.message(DeleteProductsStates.number_poizon_product)
+@admin_required
+async def handle_number_poizon_product_for_deleting(
+    message: Message, state: FSMContext
+):
+    try:
+        row_number = int(message.text)
+        if row_number < 1:
+            await message.answer("Номер товара должен быть положительным числом")
+            return
+
+        async with async_session_maker() as session:
+            # Создаем подзапрос с нумерацией строк
+            numbered_rows = select(
+                ProductsPoizonLinksOrm.id,
+                func.row_number()
+                .over(order_by=ProductsPoizonLinksOrm.id)
+                .label("row_num"),
+            ).alias("numbered_rows")
+
+            # Собираем полный DELETE запрос
+            delete_stmt = delete(ProductsPoizonLinksOrm).where(
+                ProductsPoizonLinksOrm.id
+                == (
+                    select(numbered_rows.c.id)
+                    .where(numbered_rows.c.row_num == row_number)
+                    .scalar_subquery()
+                )
+            )
+
+            result = await session.execute(delete_stmt)
+            await session.commit()
+
+            if result.rowcount > 0:
+                await message.answer(f"✅ Товар №{row_number} успешно удален")
+                update_all_rows_about_products_in_sheet.delay()
+            else:
+                await message.answer("❌ Товар с таким номером не найден")
+
+    except ValueError:
+        await message.answer("Пожалуйста, введите число")
+    except Exception as e:
+        await message.answer(f"⚠️ Ошибка: {str(e)}")
     finally:
         await state.clear()
 
@@ -116,11 +185,13 @@ async def handle_get_data_about_price(message: Message):
 @admin_required
 async def handle_change_data_price(message: Message, state: FSMContext):
     await state.set_state(ChangeDataPrice.new_data_about_price)
-    await message.answer("Пришлите новые данные для ценообразования\.\n"
-                         "Данные предполагают следующий формат\:\n"
-                         """``` B - Цена доставки ¥\n C - Курс ¥ к ₽\n D - Коэффициент наценки ₽```"""
-                         "Скопируйте фрагмент сообщения и отправьте его вписав все значения переменных\.",
-                         parse_mode=aiogram.enums.parse_mode.ParseMode('MarkdownV2'))
+    await message.answer(
+        "Пришлите новые данные для ценообразования\.\n"
+        "Данные предполагают следующий формат\:\n"
+        """``` B - Цена доставки ¥\n C - Курс ¥ к ₽\n D - Коэффициент наценки ₽```"""
+        "Скопируйте фрагмент сообщения и отправьте его вписав все значения переменных\.",
+        parse_mode=aiogram.enums.parse_mode.ParseMode("MarkdownV2"),
+    )
 
 
 @dp.message(ChangeDataPrice.new_data_about_price)
@@ -136,19 +207,27 @@ async def handle_new_data_about_price(message: Message, state: FSMContext):
             delete_stmt = delete(DataForFinalPrice)
             await session.execute(delete_stmt)
             add_stmt = insert(DataForFinalPrice).values(
-            delivery_price_in_yuan=float(values[0]),
-            yuan_to_ruble_exchange_rate=float(values[1]),
-            markup_coefficient=float(values[2]))
+                delivery_price_in_yuan=float(values[0]),
+                yuan_to_ruble_exchange_rate=float(values[1]),
+                markup_coefficient=float(values[2]),
+            )
             await session.execute(add_stmt)
             await session.commit()
-        await message.answer("Данные ценообразования успешно изменены.")
     except Exception as e:
         await message.answer("Неверный формат данных")
+    else:
+        await message.answer(
+            "Данные ценообразования успешно изменены.\n"
+            "Автоматическое обновление таблицы запущено в фоновом режиме."
+        )
+        update_all_rows_about_products_in_sheet.delay()
     finally:
         await state.clear()
 
 
-async def show_products_page(bot: Bot, chat_id: int, message_id: int, page: int, items: list):
+async def show_products_page(
+    bot: Bot, chat_id: int, message_id: int, page: int, items: list
+):
     count_of_items = 10
     start_idx = page * count_of_items
     end_idx = start_idx + count_of_items
@@ -156,26 +235,23 @@ async def show_products_page(bot: Bot, chat_id: int, message_id: int, page: int,
 
     message_text = ""
 
-    for idx, (link, name) in enumerate(page_items, start=start_idx+1):
+    for idx, (link, name) in enumerate(page_items, start=start_idx + 1):
         message_text += f"{idx}) {name}\n{link}\n\n"
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[])
 
     if page > 0:
-        keyboard.inline_keyboard.append([
-            InlineKeyboardButton(text="⬅️ Назад", callback_data=f"prev_{page}")
-        ])
+        keyboard.inline_keyboard.append(
+            [InlineKeyboardButton(text="⬅️ Назад", callback_data=f"prev_{page}")]
+        )
 
     if end_idx < len(items):
-        keyboard.inline_keyboard.append([
-            InlineKeyboardButton(text="Вперед ➡️", callback_data=f"next_{page}")
-        ])
+        keyboard.inline_keyboard.append(
+            [InlineKeyboardButton(text="Вперед ➡️", callback_data=f"next_{page}")]
+        )
 
     await bot.edit_message_text(
-        chat_id=chat_id,
-        message_id=message_id,
-        text=message_text,
-        reply_markup=keyboard
+        chat_id=chat_id, message_id=message_id, text=message_text, reply_markup=keyboard
     )
 
 
@@ -190,9 +266,9 @@ async def handle_get_all_poizon_products_links(message: Message, state: FSMConte
         sent_message = await message.answer("Загрузка списка товаров...")
 
         await state.update_data(
-            all_items = all_poizon_data_list,
+            all_items=all_poizon_data_list,
             current_page=0,
-            message_id=sent_message.message_id
+            message_id=sent_message.message_id,
         )
 
         await show_products_page(
@@ -200,7 +276,7 @@ async def handle_get_all_poizon_products_links(message: Message, state: FSMConte
             chat_id=message.chat.id,
             message_id=sent_message.message_id,
             items=all_poizon_data_list,
-            page=0
+            page=0,
         )
 
 
@@ -223,7 +299,7 @@ async def process_page_switch(callback: CallbackQuery, state: FSMContext):
         chat_id=callback.message.chat.id,
         message_id=message_id,
         items=all_items,
-        page=new_page
+        page=new_page,
     )
     await callback.answer()
 

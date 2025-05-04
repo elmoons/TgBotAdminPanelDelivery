@@ -31,13 +31,21 @@ def update_all_rows_about_products_in_sheet():
     worksheet = sh.sheet1
     worksheet.clear()
     try:
-        data_about_prices = asyncio.run(get_data_about_price_from_db(async_session_maker_null_pool))
+        data_about_prices = asyncio.run(
+            get_data_about_price_from_db(async_session_maker_null_pool)
+        )
     except NotDataAboutPrice:
-        logging.warning("Не удалось запустить задачу по обновлению таблицы, на были получены данные о ценообразовании.")
+        logging.warning(
+            "Не удалось запустить задачу по обновлению таблицы, на были получены данные о ценообразовании."
+        )
     except NotDataAboutProducts:
-        logging.warning("Не удалось запустить задачу по обновлению таблицы, на были получены данные о добавленных товарах.")
+        logging.warning(
+            "Не удалось запустить задачу по обновлению таблицы, на были получены данные о добавленных товарах."
+        )
     else:
-        all_products_links = asyncio.run(get_all_products_links(async_session_maker_null_pool))
+        all_products_links = asyncio.run(
+            get_all_products_links(async_session_maker_null_pool)
+        )
         for i in range(len(all_products_links)):
             spuid = get_spuid(all_products_links[i][1])
             data = get_data_about_product(spuid)

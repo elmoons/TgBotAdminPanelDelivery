@@ -10,6 +10,6 @@ celery_instance = Celery(
 celery_instance.conf.beat_schedule = {
     "name": {
         "task": "update_sheet_regularly",
-        "schedule": crontab(minute='0', hour='0', day_of_month='*/3'),
+        "schedule": crontab(minute="0", hour="0", day_of_month="*/3"),
     }
 }

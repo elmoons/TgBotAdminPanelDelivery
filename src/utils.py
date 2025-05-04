@@ -22,7 +22,9 @@ def admin_required(handler):
             return await handler(message, *args, **kwargs)
         else:
             await message.answer("You can't use this bot.")
+
     return wrapper
+
 
 """
 Формула расчета итоговой стоимости:
@@ -35,8 +37,9 @@ def admin_required(handler):
     d - Коэффициент наценки
 """
 
+
 def final_cost_formula(a: float, b: float, c: float, d: float) -> float:
-    final_price = (((a + b) * c) * d)
+    final_price = ((a + b) * c) * d
     return final_price
 
 
@@ -66,7 +69,9 @@ async def get_all_products_links(session_factory) -> list[tuple]:
         return links
 
 
-def add_data_to_sheet_sync(sh: Spreadsheet, data: list, data_about_prices: dict) -> None:
+def add_data_to_sheet_sync(
+    sh: Spreadsheet, data: list, data_about_prices: dict
+) -> None:
     worksheet = sh.sheet1
 
     rows = []
@@ -105,5 +110,3 @@ def add_data_to_sheet_sync(sh: Spreadsheet, data: list, data_about_prices: dict)
             )
 
     worksheet.append_rows(rows, value_input_option="USER_ENTERED")
-
-
