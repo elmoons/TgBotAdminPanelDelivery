@@ -104,7 +104,7 @@ async def handle_number_poizon_product_for_deleting(
     try:
         row_number = int(message.text)
         if row_number < 1:
-            await message.answer("Номер товара должен быть положительным числом")
+            await message.answer("Номер товара должен быть положительным числом.")
             return
 
         async with async_session_maker() as session:
@@ -130,15 +130,13 @@ async def handle_number_poizon_product_for_deleting(
             await session.commit()
 
             if result.rowcount > 0:
-                await message.answer(f"✅ Товар №{row_number} успешно удален")
+                await message.answer(f"✅ Товар №{row_number} успешно удален.")
                 update_all_rows_about_products_in_sheet.delay()
             else:
-                await message.answer("❌ Товар с таким номером не найден")
+                await message.answer("❌ Товар с таким номером не найден.")
 
     except ValueError:
-        await message.answer("Пожалуйста, введите число")
-    except Exception as e:
-        await message.answer(f"⚠️ Ошибка: {str(e)}")
+        await message.answer("Пожалуйста, введите число.")
     finally:
         await state.clear()
 
