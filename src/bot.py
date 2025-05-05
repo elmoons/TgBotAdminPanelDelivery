@@ -1,5 +1,6 @@
 import aiogram
 from gspread import Spreadsheet
+from gspread.exceptions import APIError
 
 from src.database.database import async_session_maker
 from src.database.models import ProductsPoizonLinksOrm, DataForFinalPrice
@@ -144,24 +145,29 @@ async def handle_number_poizon_product_for_deleting(
 @dp.message(Command(commands="update_all_products"))
 @admin_required
 async def handle_update_all_rows_in_sheet(message: Message):
-    sh: Spreadsheet = initial_sheets()
-    worksheet = sh.sheet1
-    worksheet.clear()
     try:
-        data_about_prices = await get_data_about_price_from_db(async_session_maker)
-        all_products_links = await get_all_products_links(async_session_maker)
-    except NotDataAboutPrice as e:
-        await message.answer(str(e.detail))
-    except NotDataAboutProducts as e:
-        await message.answer(str(e.detail))
+        sh: Spreadsheet = initial_sheets()
+        worksheet = sh.sheet1
+        worksheet.clear()
+    except APIError as e:
+        if "Quota exceeded" in str(e):
+            await message.answer("⚠️ Лимит запросов превышен, повторите запрос через 1 минуту.")
     else:
-        for i in range(len(all_products_links)):
-            spuid = get_spuid(all_products_links[i][1])
-            data = get_data_about_product(spuid)
-            json.dumps(data, ensure_ascii=False, indent=4)
-            await add_data_to_sheet(sh, data, data_about_prices)
+        try:
+            data_about_prices = await get_data_about_price_from_db(async_session_maker)
+            all_products_links = await get_all_products_links(async_session_maker)
+        except NotDataAboutPrice as e:
+            await message.answer(str(e.detail))
+        except NotDataAboutProducts as e:
+            await message.answer(str(e.detail))
+        else:
+            for i in range(len(all_products_links)):
+                spuid = get_spuid(all_products_links[i][1])
+                data = get_data_about_product(spuid)
+                json.dumps(data, ensure_ascii=False, indent=4)
+                await add_data_to_sheet(sh, data, data_about_prices)
 
-        await message.answer("Таблица была успешно обновлена.")
+            await message.answer("Таблица была успешно обновлена.")
 
 
 @dp.message(Command(commands="get_data_about_price"))
@@ -212,7 +218,7 @@ async def handle_new_data_about_price(message: Message, state: FSMContext):
             await session.execute(add_stmt)
             await session.commit()
     except Exception as e:
-        await message.answer("Неверный формат данных")
+        await message.answer("Ошибка.\nНеверный формат данных.")
     else:
         await message.answer(
             "Данные ценообразования успешно изменены.\n"
@@ -233,8 +239,11 @@ async def show_products_page(
 
     message_text = ""
 
-    for idx, (link, name) in enumerate(page_items, start=start_idx + 1):
-        message_text += f"{idx}) {name}\n{link}\n\n"
+    for idx, (name, link) in enumerate(page_items, start=start_idx + 1):
+        message_text += f"{idx}. {name}\n{link}\n\n"
+
+    total_pages = (len(items) + count_of_items - 1) // count_of_items
+    message_text += f"📄 Страница {page + 1}/{total_pages}"
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[])
 
@@ -286,7 +295,7 @@ async def process_page_switch(callback: CallbackQuery, state: FSMContext):
         current_page = int(callback.data.split("_")[1])
         message_id = data["message_id"]
     except KeyError:
-        await callback.answer("Данное сообщение устарело, используйте комманды.")
+        await callback.answer("Данное сообщение устарело, используйте команды.")
     else:
         if callback.data.startswith("prev_"):
             new_page = current_page - 1
@@ -314,7 +323,7 @@ async def handle_get_google_sheets_link(message: Message):
     button1 = types.InlineKeyboardButton(text="Google Sheets", web_app=web_info)
     markup = types.InlineKeyboardMarkup(inline_keyboard=[[button1]])
 
-    await message.answer("Кнопка для перехода в таблицу", reply_markup=markup)
+    await message.answer("Кнопка для перехода в таблицу.", reply_markup=markup)
 
 
 @dp.message()
