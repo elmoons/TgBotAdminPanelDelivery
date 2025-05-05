@@ -1,6 +1,9 @@
+import logging
+
 import requests
 from urllib import parse
 from src.config import settings
+from src.exceptions import PoizonAPIError
 
 USED_PRODUCTS = ["堪比新机", "自用首选"]
 
@@ -22,6 +25,10 @@ def get_data_about_product(spuId: int):
         params=params,
         headers=headers,
     )
+
+    if response.status_code == 400:
+        raise PoizonAPIError
+
     if response.status_code != 200:
         raise KeyError(f"API Error: {response.status_code}")
 

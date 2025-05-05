@@ -10,3 +10,10 @@ class NotDataAboutProducts(Exception):
         "Ни один товар не был добавлен.\n"
         "Добавьте товары по команде: /add_poizon_product."
     )
+
+
+class PoizonAPIError(Exception):
+    detail = (
+        "Ошибка PoizonAPI, возможно в данный момент сервер недоступен "
+        "или на балансе закончились средства."
+    )

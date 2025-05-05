@@ -4,7 +4,7 @@ from gspread.exceptions import APIError
 
 from src.database.database import async_session_maker
 from src.database.models import ProductsPoizonLinksOrm, DataForFinalPrice
-from src.exceptions import NotDataAboutPrice, NotDataAboutProducts
+from src.exceptions import NotDataAboutPrice, NotDataAboutProducts, PoizonAPIError
 from src.parse import get_data_about_product, get_spuid
 from src.sheets import add_data_to_sheet, initial_sheets
 from src.tasks.tasks import update_all_rows_about_products_in_sheet
@@ -49,7 +49,7 @@ class ChangeDataPrice(StatesGroup):
 async def command_start_handler(message: Message):
     await message.answer(
         f"Привет! Этот бот создан для добавления товаров c Poizon в Google Sheets!\n"
-        f"Цены на товары обновляются в фоновом режиме.\n"
+        f"Цены на товары обновляются как в ручном, так и в фоновом режиме.\n"
         f"Список команд находится в меню!"
     )
 
@@ -58,7 +58,9 @@ async def command_start_handler(message: Message):
 @admin_required
 async def handle_command_add_poizon_product(message: Message, state: FSMContext):
     await state.set_state(AddProductStates.link_poizon_product)
-    await message.answer("Пришлите ссылку на товар.")
+    await message.answer(
+        "Пришлите ссылку на товар. Обратите внимание, ссылка должна содержать SpuID товара."
+    )
 
 
 @dp.message(AddProductStates.link_poizon_product)
@@ -68,8 +70,10 @@ async def handle_poizon_link(message: Message, state: FSMContext):
         spuid = get_spuid(message.text)
         data = get_data_about_product(spuid)
         json.dumps(data, ensure_ascii=False, indent=4)
+    except PoizonAPIError as e:
+        await message.answer(str(e.detail))
     except KeyError:
-        await message.answer("Некорректная ссылка. Не удалось получить SpuId товара.")
+        await message.answer(f"Некорректная ссылка. Не удалось получить SpuId товара.")
     else:
         async with async_session_maker() as session:
             stmt_product_add = insert(ProductsPoizonLinksOrm).values(
@@ -131,8 +135,10 @@ async def handle_number_poizon_product_for_deleting(
             await session.commit()
 
             if result.rowcount > 0:
-                await message.answer(f"✅ Товар №{row_number} успешно удален.")
-                update_all_rows_about_products_in_sheet.delay()
+                await message.answer(
+                    f"✅ Товар №{row_number} успешно удален.\n"
+                    f"Обновите таблицу по команде /update_all_products для актуализации."
+                )
             else:
                 await message.answer("❌ Товар с таким номером не найден.")
 
@@ -151,7 +157,9 @@ async def handle_update_all_rows_in_sheet(message: Message):
         worksheet.clear()
     except APIError as e:
         if "Quota exceeded" in str(e):
-            await message.answer("⚠️ Лимит запросов превышен, повторите запрос через 1 минуту.")
+            await message.answer(
+                "⚠️ Лимит запросов превышен, повторите запрос через 1 минуту."
+            )
     else:
         try:
             data_about_prices = await get_data_about_price_from_db(async_session_maker)
@@ -161,13 +169,21 @@ async def handle_update_all_rows_in_sheet(message: Message):
         except NotDataAboutProducts as e:
             await message.answer(str(e.detail))
         else:
+            success = False
             for i in range(len(all_products_links)):
                 spuid = get_spuid(all_products_links[i][1])
-                data = get_data_about_product(spuid)
-                json.dumps(data, ensure_ascii=False, indent=4)
-                await add_data_to_sheet(sh, data, data_about_prices)
+                try:
+                    data = get_data_about_product(spuid)
+                except PoizonAPIError as e:
+                    await message.answer(str(e.detail))
+                    break
+                else:
+                    json.dumps(data, ensure_ascii=False, indent=4)
+                    await add_data_to_sheet(sh, data, data_about_prices)
+                    success = True
 
-            await message.answer("Таблица была успешно обновлена.")
+            if success:
+                await message.answer("Таблица была успешно обновлена.")
 
 
 @dp.message(Command(commands="get_data_about_price"))
@@ -240,7 +256,7 @@ async def show_products_page(
     message_text = ""
 
     for idx, (name, link) in enumerate(page_items, start=start_idx + 1):
-        message_text += f"{idx}. {name}\n{link}\n\n"
+        message_text += f"{idx}\. {name}\n[Ссылка на товар]({link})\n\n"
 
     total_pages = (len(items) + count_of_items - 1) // count_of_items
     message_text += f"📄 Страница {page + 1}/{total_pages}"
@@ -258,7 +274,11 @@ async def show_products_page(
         )
 
     await bot.edit_message_text(
-        chat_id=chat_id, message_id=message_id, text=message_text, reply_markup=keyboard
+        chat_id=chat_id,
+        message_id=message_id,
+        text=message_text,
+        reply_markup=keyboard,
+        parse_mode="MarkdownV2",
     )
 
 
