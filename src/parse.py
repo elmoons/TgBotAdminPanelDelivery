@@ -11,8 +11,6 @@ USED_PRODUCTS = ["堪比新机", "自用首选"]
 def get_spuid(product_link: str):
     query = parse.urlparse(product_link).query
     spuid = parse.parse_qs(query)["spuId"][0]
-    if spuid is None:
-        raise ValueError("SpuId is None")
     return spuid
 
 
