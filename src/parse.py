@@ -1,5 +1,3 @@
-import logging
-
 import requests
 from urllib import parse
 from src.config import settings

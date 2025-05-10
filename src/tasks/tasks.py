@@ -5,6 +5,7 @@ import os
 
 import gspread
 from gspread import Spreadsheet
+from gspread.exceptions import APIError
 
 from src.config import settings
 from src.database.database import async_session_maker_null_pool
@@ -26,29 +27,34 @@ def initial_sheets_for_tasks():
 
 @celery_instance.task(name="update_sheet_regularly")
 def update_all_rows_about_products_in_sheet():
-    logging.info("Фоновая задача по обновлению таблицы была начата.")
-    sh: Spreadsheet = initial_sheets_for_tasks()
-    worksheet = sh.sheet1
-    worksheet.clear()
     try:
-        data_about_prices = asyncio.run(
-            get_data_about_price_from_db(async_session_maker_null_pool)
-        )
-    except NotDataAboutPrice:
-        logging.warning(
-            "Не удалось запустить задачу по обновлению таблицы, на были получены данные о ценообразовании."
-        )
-    except NotDataAboutProducts:
-        logging.warning(
-            "Не удалось запустить задачу по обновлению таблицы, на были получены данные о добавленных товарах."
-        )
+        logging.info("Фоновая задача по обновлению таблицы была начата.")
+        sh: Spreadsheet = initial_sheets_for_tasks()
+        worksheet = sh.sheet1
+        worksheet.clear()
+    except APIError as e:
+        if "Quota exceeded" in str(e):
+            logging.info("Лимит запросов превышен")
     else:
-        all_products_links = asyncio.run(
-            get_all_products_links(async_session_maker_null_pool)
-        )
-        for i in range(len(all_products_links)):
-            spuid = get_spuid(all_products_links[i][1])
-            data = get_data_about_product(spuid)
-            json.dumps(data, ensure_ascii=False, indent=4)
-            asyncio.run(add_data_to_sheet(sh, data, data_about_prices))
-        logging.info("Фоновая задача по обновлению таблицы была закончена.")
+        try:
+            data_about_prices = asyncio.run(
+                get_data_about_price_from_db(async_session_maker_null_pool)
+            )
+        except NotDataAboutPrice:
+            logging.warning(
+                "Не удалось запустить задачу по обновлению таблицы, на были получены данные о ценообразовании."
+            )
+        except NotDataAboutProducts:
+            logging.warning(
+                "Не удалось запустить задачу по обновлению таблицы, на были получены данные о добавленных товарах."
+            )
+        else:
+            all_products_links = asyncio.run(
+                get_all_products_links(async_session_maker_null_pool)
+            )
+            for i in range(len(all_products_links)):
+                spuid = get_spuid(all_products_links[i][1])
+                data = get_data_about_product(spuid)
+                json.dumps(data, ensure_ascii=False, indent=4)
+                asyncio.run(add_data_to_sheet(sh, data, data_about_prices))
+            logging.info("Фоновая задача по обновлению таблицы была закончена.")
