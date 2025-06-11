@@ -53,7 +53,7 @@ services:
     command: "celery --app=src.tasks.celery_app:celery_instance beat -l INFO"
 
 networks:
-  ç:
+  myNetwork:
     external: true
 
 volumes:
