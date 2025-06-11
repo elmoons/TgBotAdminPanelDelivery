@@ -4,8 +4,8 @@ services:
     container_name: 'panel_db'
     image: postgres:16
     environment:
-      POSTGRES_USER: abcde
-      POSTGRES_PASSWORD: abcde
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: MetalleLmoons2004!
       POSTGRES_DB: postgres
     networks:
       - myNetwork
@@ -53,7 +53,7 @@ services:
     command: "celery --app=src.tasks.celery_app:celery_instance beat -l INFO"
 
 networks:
-  myNetwork:
+  ç:
     external: true
 
 volumes:
